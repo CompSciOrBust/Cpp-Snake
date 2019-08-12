@@ -1,11 +1,11 @@
 #include <iostream>
-#include <conio.h>
-#include <windows.h>
+#include <switch.h>
 #include <time.h> // To make spawn value more random
 using namespace std;
 bool gameOver;
-const int width = 20;
-const int height = 20;
+//Changed the width an height to better match the Switch's screen size.
+const int width = 77;
+const int height = 41;
 int x, y, fruitX, fruitY, score;
 int tailX[100], tailY[100];
 int nTail;
@@ -23,21 +23,20 @@ void Setup()
 }
 void Draw()
 {
-    system("cls"); //system("clear");
     for (int i = 0; i < width+2; i++)
-        cout << "#";
-    cout << endl;
+    printf("#");
+    printf("\n");
 
     for (int i = 0; i < height; i++)
     {
         for (int j = 0; j < width; j++)
         {
             if (j == 0)
-                cout << "#";
+                printf("#");
             if (i == y && j == x)
-                cout << "O";
+                printf("\033[0;32mO\033[0m");//Make snake green
             else if (i == fruitY && j == fruitX)
-                cout << "F";
+                printf("F");
             else
             {
                 bool print = false;
@@ -45,49 +44,54 @@ void Draw()
                 {
                     if (tailX[k] == j && tailY[k] == i)
                     {
-                        cout << "o";
+                        printf("\033[0;32mo\033[0m");//Make snake green
                         print = true;
                     }
                 }
                 if (!print)
-                    cout << " ";
+                    printf(" ");
             }
 
             if (j == width - 1)
-                cout << "#";
+                printf("#");
         }
-        cout << endl;
+        printf("\n");
     }
 
     for (int i = 0; i < width+2; i++)
-        cout << "#";
-    cout << endl;
-    cout << "Score:" << score << endl;
+    printf("#");
+    printf("\n");
+    printf("Score:%i\n", score);
 }
 void Input()
 {
-    if (_kbhit())
+	//Scan input for switch buttons
+	hidScanInput();
+	u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+	//Check if statements if key was pressed this frame
+    //Can't use switch statement for input with libnx
+	if (kDown)
     {
-        switch (_getch())
-        {
-            case 'a':
-                dir = LEFT;
-                break;
-            case 'd':
-                dir = RIGHT;
-                break;
-            case 'w':
-                dir = UP;
-                break;
-            case 's':
-                dir = DOWN;
-                break;
-            case 'x':
-                gameOver = true;
-                break;
-            default:
-                break;
-        }
+		if(kDown & KEY_PLUS)
+		{
+			gameOver = true;
+		}
+		if(kDown & KEY_DLEFT)
+		{
+			dir = LEFT;
+		}
+		if(kDown & KEY_DRIGHT)
+		{
+			dir = RIGHT;
+		}
+		if(kDown & KEY_DUP)
+		{
+			dir = UP;
+		}
+		if(kDown & KEY_DOWN)
+		{
+			dir = DOWN;
+		}
     }
 }
 void Logic()
@@ -123,10 +127,11 @@ void Logic()
         default:
             break;
     }
-    if (x > width || x < 0 || y > height || y < 0)
-      gameOver = true;
-    //if (x >= width) x = 0; else if (x < 0) x = width - 1;
-    //if (y >= height) y = 0; else if (y < 0) y = height - 1;
+	//Changed the consequences for walking in to a wall to better suit the screen size of the switch
+    //if (x > width || x < 0 || y > height || y < 0)
+      //gameOver = true;
+    if (x >= width) x = 0; else if (x < 0) x = width - 1;
+    if (y >= height) y = 0; else if (y < 0) y = height - 1;
 
     for (int i = 0; i < nTail; i++)
         if (tailX[i] == x && tailY[i] == y)
@@ -141,15 +146,51 @@ void Logic()
         nTail++;
     }
 }
+
+//Reset code for switch
+void Reset()
+{
+	gameOver = false;//New game so reset game over state
+	fill_n(tailX, 100, 0); //Reset the tail length
+	fill_n(tailY, 100, 0); //Reset the tail length
+	nTail = 0; //Reset the tail length
+	dir = STOP; //Reset the movement direction
+}
+
 int main()
 {
+	consoleInit(NULL); //Init the switch console
+	Restart:
     Setup();
     while (!gameOver)
     {
         Draw();
+		consoleUpdate(NULL); //Update the console output
+		svcSleepThread(100); //This game speed is more managable on the switch
         Input();
         Logic();
-        Sleep(50); //sleep(10);
     }
+	//Output the score and the instructions to start again on death
+	printf("Game over!\nScore:%i\nMinus to exit or plus to play again.", score);
+	consoleUpdate(NULL);
+	//Game over logic. Changed from the code written by NULLx76 because that boots the user back in to hb menu on the switch
+	while(true)
+	{
+	hidScanInput();
+	u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+	//When plus is pressed reset the vars and go to the restart label
+	if(kDown & KEY_PLUS)
+	{
+		Reset();
+		goto Restart;
+	}
+	//When minus is pressed return zero and go back to the homebrew menu
+	if(kDown & KEY_MINUS)
+	{
+		goto Exit;
+	}
+	}
+	Exit:
+	consoleExit(NULL);
     return 0;
 }
