@@ -159,6 +159,7 @@ void Reset()
 
 int main()
 {
+	appletInitializeGamePlayRecording();//Enable video capture
 	consoleInit(NULL); //Init the switch console
 	Restart:
     Setup();
